@@ -2,8 +2,11 @@ import express from "express";
 import dotenv from "dotenv";
 import cors from "cors";
 import connectDB from "./config/mongo.js";
-import authRoutes from "./routes/authRoutes.js"
-
+import authRoutes from "./routes/authRoutes.js";
+import serviceRoutes from "./routes/serviceRoutes.js";
+import artisanProfileRoutes from "./routes/artisanProfileRoutes.js";
+import requestRoutes from "./routes/RequestRoutes.js";
+import responseRoutes from "./routes/ResponseRoutes.js";
 
 dotenv.config();
 
@@ -20,6 +23,10 @@ app.get("/", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/services", serviceRoutes);
+app.use("/api/artisan-profiles", artisanProfileRoutes);
+app.use("/api/request",requestRoutes);
+app.use("/api/response",responseRoutes);
 
 const PORT = process.env.PORT || 5000;
 

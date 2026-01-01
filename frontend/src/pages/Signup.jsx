@@ -1,12 +1,15 @@
-import React, { useState } from "react";
+// pages/Signup.jsx
+import React, { useState, useEffect,useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
-import { signupUser } from "../redux/auth/authSlice";
+import { signupUser, clearError } from "../redux/auth/authSlice";
+import { checkUserArtisanProfile } from "../services/artisanProfileService";
 
 const Signup = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector(state => state.auth);
+  const { loading, error, user,token } = useSelector(state => state.auth);
+  const [checkingProfile, setCheckingProfile] = useState(false);
 
   const [formData, setFormData] = useState({
     firstName: "",
@@ -16,8 +19,51 @@ const Signup = () => {
     role: "artisan"
   });
 
+  const handleUserRedirection = useCallback(async (user) => {
+    if (user.role === "admin") {
+      navigate("/admin");
+      return;
+    }
+
+    if (user.role === "artisan") {
+      try {
+        console.log("userData", user);
+        const profileExists = await checkUserArtisanProfile(user.id);
+        if (profileExists.exists === true) {
+          navigate("/profile");
+        } else {
+          navigate("/create-profile");
+        }
+      } catch (error) {
+        console.error("Erreur lors de la vérification du profil:", error);
+        navigate("/create-profile");
+      } finally {
+        setCheckingProfile(false);
+      }
+    } else {
+      navigate("/home");
+    }
+  }, [navigate]);
+
+     useEffect(() => {
+      if (user && token) {
+        handleUserRedirection(user);
+      }
+    }, [user, token, handleUserRedirection]);
+
+  // Nettoyer les erreurs quand le composant se démonte
+  useEffect(() => {
+    return () => {
+      dispatch(clearError());
+    };
+  }, [dispatch]);
+
   const handleChange = (e) => {
     setFormData({...formData, [e.target.name]: e.target.value});
+    // Effacer l'erreur quand l'utilisateur commence à taper
+    if (error) {
+      dispatch(clearError());
+    }
   };
 
   const handleSubmit = (e) => {
@@ -34,8 +80,8 @@ const Signup = () => {
       <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <div className="text-center">
-          <image src="../assets/fixi_logo.jpg" width={10}height={10}></image>
           <h1 className="text-4xl font-bold text-[#003366] mb-2">Fixi</h1>
+          <p className="text-[#003366] opacity-80">Votre partenaire de confiance</p>
         </div>
 
         {/* Form Card */}
@@ -109,8 +155,9 @@ const Signup = () => {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                minLength="6"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#FF8C00] focus:border-transparent transition-all duration-200"
-                placeholder="Créez un mot de passe"
+                placeholder="Créez un mot de passe (min. 6 caractères)"
               />
             </div>
 
@@ -129,6 +176,12 @@ const Signup = () => {
                 <option value="artisan">👨‍🔧 Artisan</option>
                 <option value="client">👤 Client</option>
               </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.role === "artisan" 
+                  ? "En tant qu'artisan, vous devrez compléter votre profil après l'inscription"
+                  : "En tant que client, vous pourrez rechercher et contacter des artisans"
+                }
+              </p>
             </div>
 
             {/* Error Message */}

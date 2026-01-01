@@ -1,25 +1,69 @@
-import React, { useState } from "react";
+// pages/Signin.jsx
+import React, { useState, useEffect, useCallback } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { signinUser } from "../redux/auth/authSlice";
-import logo from "../assets/fixi_logo-removebg-preview.png";
+import { checkUserArtisanProfile } from "../services/artisanProfileService";
 
 const Signin = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { loading, error } = useSelector((state) => state.auth);
+  const { user, token, loading, error } = useSelector((state) => state.auth);
 
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   });
 
+  const [checkingProfile, setCheckingProfile] = useState(false);
+
+  const handleUserRedirection = useCallback(
+    async (userData) => {
+      if (userData.role === "admin") {
+        navigate("/admin");
+        return;
+      }
+
+      if (userData.role === "artisan") {
+        setCheckingProfile(true);
+        try {
+          console.log("userData", userData);
+          const profileExists = await checkUserArtisanProfile(userData.id);
+          if (profileExists.exists === true) {
+            navigate(`/artisan-profile/${profileExists.profileId}`);
+          } else {
+            navigate("/create-profile");
+          }
+        } catch (error) {
+          console.error("Erreur lors de la vérification du profil:", error);
+          navigate("/create-profile");
+        } finally {
+          setCheckingProfile(false);
+        }
+      } else {
+        navigate("/home");
+      }
+    },
+    [navigate]
+  );
+
+  useEffect(() => {
+    if (user && token) {
+      handleUserRedirection(user);
+    }
+  }, [user, token, handleUserRedirection]);
+
   const handleChange = (e) =>
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    dispatch(signinUser(formData));
+    const resultAction = await dispatch(signinUser(formData));
+
+    if (signinUser.fulfilled.match(resultAction)) {
+      const userData = resultAction.payload.user;
+      await handleUserRedirection(userData);
+    }
   };
 
   const goToSignup = () => {
@@ -33,13 +77,20 @@ const Signin = () => {
         <div className="text-center mb-6">
           <div className="w-20 h-20 mx-auto mb-2 rounded-full overflow-hidden border-4 border-[#FF8C00] shadow-lg">
             <img
-              src={logo}
+              src="fixi_logo-removebg-preview.png"
               alt="Fixi Logo"
               className="w-full h-full object-cover"
             />
           </div>
           <h1 className="text-4xl font-bold text-[#003366]">Fixi</h1>
         </div>
+        <button
+          type="button"
+          onClick={() => navigate("/home")}
+          className="absolute top-4 right-6 text-sm text-gray-600 hover:text-[#FF8C00] font-medium underline transition-colors"
+        >
+          Continuer en tant que visiteur
+        </button>
 
         {/* Form Card */}
         <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
@@ -100,13 +151,15 @@ const Signin = () => {
             {/* Submit Button */}
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || checkingProfile}
               className="w-full bg-[#FF8C00] hover:bg-[#e67e00] text-white py-3 px-4 rounded-lg font-semibold transition-all duration-200 transform hover:scale-[1.02] focus:ring-2 focus:ring-[#FF8C00] focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
+              {loading || checkingProfile ? (
                 <div className="flex items-center justify-center">
                   <div className="w-5 h-5 border-t-2 border-white border-solid rounded-full animate-spin mr-2"></div>
-                  Connexion en cours...
+                  {checkingProfile
+                    ? "Vérification du profil..."
+                    : "Connexion en cours..."}
                 </div>
               ) : (
                 "Se connecter"
